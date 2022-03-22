@@ -17,6 +17,7 @@
 package com.example.android.firebaseui_login_sample
 
 import android.app.Activity
+import android.app.Activity.RESULT_OK
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -24,6 +25,9 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat.startActivityForResult
 import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Observer
@@ -44,6 +48,29 @@ class MainFragment : Fragment() {
     private val viewModel by viewModels<LoginViewModel>()
     private lateinit var binding: FragmentMainBinding
 
+    private lateinit var getResult: ActivityResultLauncher<Intent>
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        getResult =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                val response = IdpResponse.fromResultIntent(result.data)
+                if (result.resultCode == RESULT_OK) {
+                    // User successfully signed in
+                    Log.i(
+                        TAG,
+                        "Successfully signed in user ${FirebaseAuth.getInstance().currentUser?.displayName}!"
+                    )
+                } else {
+                    // Sign in failed. If response is null the user canceled the
+                    // sign-in flow using the back button. Otherwise check
+                    // response.getError().getErrorCode() and handle the error.
+                    Log.i(TAG, "Sign in unsuccessful ${response?.error?.errorCode}")
+                }
+            }
+    }
+
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View? {
@@ -63,24 +90,6 @@ class MainFragment : Fragment() {
         binding.authButton.setOnClickListener { launchSignInFlow() }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == SIGN_IN_RESULT_CODE) {
-            val response = IdpResponse.fromResultIntent(data)
-            if (resultCode == Activity.RESULT_OK) {
-                // User successfully signed in
-                Log.i(
-                    TAG,
-                    "Successfully signed in user ${FirebaseAuth.getInstance().currentUser?.displayName}!"
-                )
-            } else {
-                // Sign in failed. If response is null the user canceled the
-                // sign-in flow using the back button. Otherwise check
-                // response.getError().getErrorCode() and handle the error.
-                Log.i(TAG, "Sign in unsuccessful ${response?.error?.errorCode}")
-            }
-        }
-    }
 
     /**
      * Observes the authentication state and changes the UI accordingly.
@@ -133,13 +142,15 @@ class MainFragment : Fragment() {
             //
         )
 
+        val intent = AuthUI.getInstance().createSignInIntentBuilder().setAvailableProviders(
+            providers
+        ).build()
+
+        getResult.launch(intent)
+
         // Create and launch sign-in intent.
         // We listen to the response of this activity with the
         // SIGN_IN_RESULT_CODE code
-        startActivityForResult(
-            AuthUI.getInstance().createSignInIntentBuilder().setAvailableProviders(
-                    providers
-                ).build(), MainFragment.SIGN_IN_RESULT_CODE
-        )
+
     }
 }
